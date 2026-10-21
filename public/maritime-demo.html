@@ -144,19 +144,20 @@
         "Pointe-Noire": [-4.7692, 11.8636]
       };
       const ROUTES = {
-        Dakar: [PORTS.Dakar, [11.5, -17.8], [4.5, -11], [3.8, -4], [2.5, 3], [-.5, 7.5], [-3.2, 10.5], PORTS["Pointe-Noire"]],
-        Abidjan: [PORTS.Abidjan, [3.5, -3.8], [2.2, 3.2], [-.8, 7.8], [-3.5, 10.6], PORTS["Pointe-Noire"]],
-        Lagos: [PORTS.Lagos, [5.2, 3.8], [2.8, 6.2], [0, 8.5], [-3, 10.8], PORTS["Pointe-Noire"]],
-        Douala: [PORTS.Douala, [3.5, 9.1], [1, 8.8], [-2, 9.8], PORTS["Pointe-Noire"]],
-        Tema: [PORTS.Tema, [4, 2.5], [2.8, 7], [3.8, 9.2], PORTS.Douala]
+        Dakar: [PORTS.Dakar, [12, -19], [7, -17], [3, -13], [1, -8], [0, -2], [-1, 4], [-3, 8], PORTS["Pointe-Noire"]],
+        Abidjan: [PORTS.Abidjan, [3, -7], [0, -9], [-3, -7], [-5, -2], [-5, 4], [-4, 9], PORTS["Pointe-Noire"]],
+        Lagos: [PORTS.Lagos, [3.5, 4.5], [1, 5], [-1.5, 6.5], [-3.5, 9], PORTS["Pointe-Noire"]],
+        Douala: [PORTS.Douala, [2, 8.5], [.5, 7.5], [-1.5, 8.5], [-3.5, 10], PORTS["Pointe-Noire"]],
+        Tema: [PORTS.Tema, [3, -2], [0, -.5], [-3, 2.5], [-5.5, 7], [-5, 10.5], PORTS["Pointe-Noire"]],
+        "Dakar South Atlantic": [PORTS.Dakar, [13, -20], [7, -21], [1, -19], [-4, -16], [-6, -10], [-6, -3], [-5.5, 4], [-4.8, 10], PORTS["Pointe-Noire"]]
       };
       const fleet = [
-        { name: "ATLANTIC MERIDIAN", type: "Porte-conteneurs", origin: "Dakar", speed: 18.2, route: "Dakar", progress: .27, color: "#38dcff" },
-        { name: "GULF COAST RUNNER", type: "Porte-conteneurs", origin: "Abidjan", speed: 16.8, route: "Abidjan", progress: .64, color: "#45d9ff" },
-        { name: "GULF OF GUINEA", type: "Pétrolier", origin: "Lagos", speed: 13.5, route: "Lagos", progress: .78, color: "#ffc05d" },
-        { name: "COASTAL SERVICE", type: "Navire de service", origin: "Douala", speed: 11.4, route: "Douala", progress: .35, color: "#75e5bb" },
-        { name: "WEST AFRICA TRADER", type: "Cargo", origin: "Tema", speed: 14.1, route: "Tema", progress: .47, color: "#bd9bff" },
-        { name: "SOUTH ATLANTIC LNG", type: "Transporteur GNL", origin: "Dakar", speed: 12.6, route: "Dakar", progress: .81, color: "#ff8bc8" }
+        { name: "ATLANTIC MERIDIAN", type: "Porte-conteneurs", origin: "Dakar", speed: 18.2, route: "Dakar", progress: .14, color: "#38dcff" },
+        { name: "GULF COAST RUNNER", type: "Porte-conteneurs", origin: "Abidjan", speed: 16.8, route: "Abidjan", progress: .42, color: "#45d9ff" },
+        { name: "GULF OF GUINEA", type: "Pétrolier", origin: "Lagos", speed: 13.5, route: "Lagos", progress: .1, color: "#ffc05d" },
+        { name: "COASTAL SERVICE", type: "Navire de service", origin: "Douala", speed: 11.4, route: "Douala", progress: .5, color: "#75e5bb" },
+        { name: "WEST AFRICA TRADER", type: "Cargo", origin: "Tema", speed: 14.1, route: "Tema", progress: .16, color: "#bd9bff" },
+        { name: "SOUTH ATLANTIC LNG", type: "Transporteur GNL", origin: "Dakar", speed: 12.6, route: "Dakar South Atlantic", progress: .5, color: "#ff8bc8" }
       ];
 
       const map = L.map("map", { zoomControl: false, preferCanvas: true }).setView([3.5, -2], 4);
@@ -242,17 +243,16 @@
         port.bindTooltip(name, { direction: "top", offset: [0, -4] });
       });
 
-      Object.entries(ROUTES).forEach(([name, coordinates]) => {
-        const forward = L.polyline(coordinates, { color: "#36c8ee", weight: 2, opacity: .36, dashArray: "5 8" }).addTo(map);
+      fleet.forEach((vessel) => {
+        const coordinates = ROUTES[vessel.route];
+        const forward = L.polyline(coordinates, { color: vessel.color, weight: 2.5, opacity: .75, dashArray: "6 7" }).addTo(map);
         routeLayers.push(forward);
-        if (name !== "Tema") {
-          routeLayers.push(L.polyline([...coordinates].reverse(), { color: "#36c8ee", weight: 1, opacity: .16, dashArray: "2 10" }).addTo(map));
-        }
+        routeLayers.push(L.polyline([...coordinates].reverse(), { color: vessel.color, weight: 1.5, opacity: .42, dashArray: "2 9" }).addTo(map));
       });
 
       fleet.forEach((vessel, index) => {
         vessel.preparedRoute = prepareRoute(ROUTES[vessel.route]);
-        vessel.destination = vessel.route === "Tema" ? "Douala" : "Pointe-Noire";
+        vessel.destination = "Pointe-Noire";
         vessel.progress = Math.max(0, Math.min(.99, vessel.progress));
         vessel.direction = 1;
         vessel.position = pointAt(vessel.preparedRoute, vessel.progress);
@@ -387,7 +387,7 @@
         showToast("Téléchargement lancé.");
       });
 
-      map.fitBounds(L.latLngBounds(Object.values(PORTS)).pad(.18));
+      map.fitBounds(L.latLngBounds(Object.values(ROUTES).flat()).pad(.12));
     })();
   </script>
 </body>

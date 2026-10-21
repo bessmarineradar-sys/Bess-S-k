@@ -37,7 +37,7 @@ Ne place jamais la clé AISStream dans une variable `VITE_*`, dans GitHub Pages 
 
 ## Simulateur autonome
 
-La page `public/maritime-demo.html` est une démonstration Leaflet autonome à ouvrir depuis `/maritime-demo.html`. Elle anime six navires fictifs en aller-retour et propose pause, réglage de vitesse, copie et téléchargement du HTML. Un bandeau indique explicitement que les données sont simulées; ces positions ne sont pas des données AIS et ne sont pas enregistrables comme prospects. La page utilise Leaflet et les tuiles Esri via Internet. Pour les positions AIS réelles, ouvre l’application Bess Sök : la clé fournisseur reste uniquement sur Render et n’est jamais saisie dans le fichier HTML.
+La page `public/maritime-demo.html` est une démonstration Leaflet autonome à ouvrir depuis `/maritime-demo.html`. Elle anime six navires fictifs sur des routes maritimes distinctes depuis Dakar, Abidjan, Tema, Lagos et Douala, en couvrant le golfe de Guinée et l’Atlantique Sud jusqu’à Pointe-Noire, puis au retour. Les routes et positions sont affichées ensemble sur la carte. La page propose pause, réglage de vitesse, copie et téléchargement du HTML. Un bandeau indique explicitement que les données sont simulées; ces positions ne sont pas des données AIS et ne sont pas enregistrables comme prospects. La page utilise Leaflet et les tuiles Esri via Internet. Pour les positions AIS réelles, ouvre l’application Bess Sök : la clé fournisseur reste uniquement sur Render et n’est jamais saisie dans le fichier HTML.
 
 ## Zone de suivi AIS
 
