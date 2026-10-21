@@ -34,10 +34,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build site
-        run: pnpm exec vite build
+        run: pnpm build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_AIS_RELAY_URL: ${{ vars.VITE_AIS_RELAY_URL }}
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:

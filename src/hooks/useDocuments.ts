@@ -7,6 +7,15 @@ import {
 } from "../types/document";
 
 const STORAGE_KEY = "maree.documents.v2";
+const LEGACY_STORAGE_KEY = "maritrack-documents";
+
+const LEGACY_CATEGORIES: Record<string, DocumentCategory> = {
+  "Identité": "identity",
+  "Véhicule": "vehicle",
+  "Assurance": "insurance",
+  "Abonnement": "subscription",
+  "Autre": "other",
+};
 
 function isDateOnly(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -40,6 +49,40 @@ function isDocument(value: unknown): value is Document {
     typeof document.createdAt === "string";
 }
 
+function migrateLegacyDocuments(value: unknown): Document[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Les anciens documents ne correspondent pas au format attendu.");
+  }
+
+  return value.map((item): Document => {
+    if (typeof item !== "object" || item === null) {
+      throw new Error("Un ancien document est invalide.");
+    }
+    const legacy = item as Record<string, unknown>;
+    if (
+      typeof legacy.id !== "string" ||
+      typeof legacy.name !== "string" ||
+      typeof legacy.category !== "string" ||
+      typeof legacy.expirationDate !== "string" ||
+      !isDateOnly(legacy.expirationDate)
+    ) {
+      throw new Error("Un ancien document contient des données invalides.");
+    }
+    const category = LEGACY_CATEGORIES[legacy.category];
+    if (!category) throw new Error("Un ancien document utilise une catégorie inconnue.");
+    return {
+      id: legacy.id,
+      name: legacy.name,
+      category,
+      expirationDate: legacy.expirationDate,
+      notes: typeof legacy.notes === "string" ? legacy.notes : "",
+      createdAt: typeof legacy.createdAt === "string"
+        ? legacy.createdAt
+        : new Date().toISOString(),
+    };
+  });
+}
+
 export function useDocuments() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -48,7 +91,15 @@ export function useDocuments() {
 
   useEffect(() => {
     try {
-      const storedValue = window.localStorage.getItem(STORAGE_KEY);
+      let storedValue = window.localStorage.getItem(STORAGE_KEY);
+      if (storedValue === null) {
+        const legacyValue = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacyValue !== null) {
+          const migratedDocuments = migrateLegacyDocuments(JSON.parse(legacyValue) as unknown);
+          storedValue = JSON.stringify(migratedDocuments);
+          window.localStorage.setItem(STORAGE_KEY, storedValue);
+        }
+      }
       if (storedValue !== null) {
         const parsedValue: unknown = JSON.parse(storedValue);
         if (!Array.isArray(parsedValue)) {
