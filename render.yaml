@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    buildCommand: pnpm install --frozen-lockfile
+    buildCommand: pnpm install --frozen-lockfile --ignore-workspace
     startCommand: pnpm start
     healthCheckPath: /health
     envVars:
