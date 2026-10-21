@@ -19,6 +19,7 @@ const ports = [
   { name: "Port d'Abidjan", longitude: -4.0083, latitude: 5.36 },
   { name: "Port de Tema", longitude: -0.187, latitude: 5.6037 },
   { name: "Port de Lagos", longitude: 3.3792, latitude: 6.5244 },
+  { name: "Port de Douala", longitude: 9.692, latitude: 4.0511 },
   { name: "Port de Pointe-Noire", longitude: 11.8636, latitude: -4.7692 },
 ];
 
@@ -48,6 +49,7 @@ interface LiveMapProps {
   trackedMmsis: ReadonlySet<string>;
   onSaveVessel: (ship: VesselForProspect) => Promise<unknown>;
   onOpenProspects: () => void;
+  onConnectionChange: (connection: { status: ConnectionStatus; message: string }) => void;
 }
 
 function isPositionMessage(value: unknown): value is PositionMessage {
@@ -94,42 +96,79 @@ function createPortElement(name: string) {
 
 function createVesselPopup(ship: LiveShip) {
   const content = document.createElement("div");
-  content.style.cssText = "min-width:180px;padding:12px;color:#e8eef4;font:12px sans-serif";
+  content.className = "vessel-popup";
   const title = document.createElement("h3");
-  title.style.cssText = "margin:0 0 8px;font-size:14px";
   title.textContent = ship.name;
-  const details = document.createElement("p");
-  details.style.cssText = "margin:0;line-height:1.7;color:#bdcbd3";
-  details.textContent = `MMSI ${ship.mmsi} · ${ship.speedKnots === null ? "Vitesse inconnue" : `${ship.speedKnots.toFixed(1)} nd`} · cap ${ship.course === null ? "inconnu" : `${Math.round(ship.course)}°`}`;
+  const details = document.createElement("dl");
+  const rows = [
+    ["MMSI", ship.mmsi],
+    ["Vitesse", ship.speedKnots === null ? "Indisponible" : `${ship.speedKnots.toFixed(1)} nd`],
+    ["Cap", ship.course === null ? "Indisponible" : `${Math.round(ship.course)}°`],
+  ];
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    term.textContent = label;
+    description.textContent = value;
+    row.append(term, description);
+    details.append(row);
+  }
   content.append(title, details);
   if (ship.destination) {
     const destination = document.createElement("p");
-    destination.style.cssText = "margin:5px 0 0;color:#9aabb7";
-    destination.textContent = `Destination déclarée : ${ship.destination}`;
+    destination.style.cssText = "margin:8px 0 0;color:#9aabb7;font-size:10px";
+    destination.textContent = `Destination AIS : ${ship.destination}`;
     content.append(destination);
   }
   return content;
 }
 
-function StatusBadge({ status, message }: { status: ConnectionStatus; message: string }) {
-  const color = status === "live"
-    ? "bg-emerald-400"
-    : status === "connecting"
-      ? "bg-amber-400"
-      : "bg-rose-400";
-  return (
-    <div aria-live="polite" className="flex items-center gap-2 rounded-full border border-white/10 bg-[#0b1926] px-3 py-1.5 text-xs text-[#c3cfd6]">
-      <span className={`h-2 w-2 rounded-full ${color} ${status === "live" ? "animate-pulse" : ""}`} />
-      {message}
-    </div>
-  );
+function vesselColor(shipType: string | null) {
+  const type = shipType?.toLocaleLowerCase("fr") ?? "";
+  if (type.includes("tanker") || type.includes("oil") || type.includes("lng")) return "#ffb768";
+  if (type.includes("passenger") || type.includes("passager")) return "#d0a3ff";
+  if (type.includes("cargo") || type.includes("container") || type.includes("bulk")) return "#61b8ff";
+  return "#45e0bd";
 }
 
-export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenProspects }: LiveMapProps) {
+function createVesselMarker(ship: LiveShip, selected: boolean) {
+  const element = document.createElement("div");
+  element.className = `live-vessel-marker ship-marker${selected ? " selected" : ""}`;
+  element.style.cssText = `width:24px;height:24px;overflow:hidden;display:grid;place-items:center;border:1px solid ${selected ? "#e8fff8" : "#0b1926"};border-radius:50%;background:#0b1926;color:${vesselColor(ship.shipType)};box-shadow:0 2px 8px rgba(0,0,0,.4);cursor:pointer`;
+  element.setAttribute("aria-label", `Navire ${ship.name}, MMSI ${ship.mmsi}`);
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("width", "16");
+  icon.setAttribute("height", "16");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("aria-hidden", "true");
+  icon.style.cssText = "width:16px;height:16px;overflow:hidden;fill:currentColor";
+  const hull = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  hull.setAttribute("d", "M12 2 20 20 12 17 4 20 12 2Z");
+  hull.setAttribute("fill", "currentColor");
+  icon.append(hull);
+  element.append(icon);
+  return element;
+}
+
+interface SpeedSample {
+  at: number;
+  speed: number;
+}
+
+export default function LiveMap({
+  session,
+  trackedMmsis,
+  onSaveVessel,
+  onOpenProspects,
+  onConnectionChange,
+}: LiveMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
+  const speedHistoryRef = useRef<Record<string, SpeedSample[]>>({});
   const [ships, setShips] = useState<Record<string, LiveShip>>({});
+  const [speedHistory, setSpeedHistory] = useState<Record<string, SpeedSample[]>>({});
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [connectionMessage, setConnectionMessage] = useState("Initialisation du flux AIS…");
   const [mapError, setMapError] = useState<string | null>(null);
@@ -153,7 +192,7 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: "mapbox://styles/mapbox/light-v11",
+        style: "mapbox://styles/mapbox/dark-v11",
         center: [-3, 8],
         zoom: 4.1,
         maxBounds: [
@@ -167,7 +206,7 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
       });
 
       ports.forEach((port) => {
-        new mapboxgl.Marker({ color: "#0b756b" })
+        new mapboxgl.Marker({ color: "#45e0bd" })
           .setLngLat([port.longitude, port.latitude])
           .setPopup(new mapboxgl.Popup({ offset: 18 }).setDOMContent(createPortElement(port.name)))
           .addTo(map.current!);
@@ -179,6 +218,7 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
     return () => {
       Object.values(markersRef.current).forEach((marker) => marker.remove());
       markersRef.current = {};
+      speedHistoryRef.current = {};
       map.current?.remove();
       map.current = null;
     };
@@ -253,6 +293,12 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
           if (!isPositionMessage(message)) return;
           const ship = message.ship;
           setLastPositionAt(Date.now());
+          if (ship.speedKnots !== null && Number.isFinite(ship.speedKnots)) {
+            const sample = { at: Date.parse(ship.receivedAt), speed: ship.speedKnots };
+            const history = [...(speedHistoryRef.current[ship.mmsi] ?? []), sample].slice(-24);
+            speedHistoryRef.current[ship.mmsi] = history;
+            setSpeedHistory((current) => ({ ...current, [ship.mmsi]: history }));
+          }
           setShips((current) => {
             const updated = { ...current, [ship.mmsi]: ship };
             const entries = Object.entries(updated);
@@ -317,13 +363,13 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
       const existing = markersRef.current[ship.mmsi];
       if (existing) {
         existing.setLngLat(coordinates).setRotation(ship.course ?? 0);
+        existing.getElement().classList.toggle("selected", ship.mmsi === selectedMmsi);
+        existing.getElement().style.borderColor = ship.mmsi === selectedMmsi ? "#e8fff8" : "#0b1926";
+        existing.getElement().style.color = vesselColor(ship.shipType);
+        existing.setPopup(new mapboxgl.Popup({ offset: 14 }).setDOMContent(createVesselPopup(ship)));
         continue;
       }
-      const element = document.createElement("div");
-      element.className = "live-vessel-marker";
-      element.style.cssText = "width:24px;height:24px;overflow:hidden;border:1px solid #126b6b;border-radius:50%;background:#082434;display:grid;place-items:center;color:#68e9df;font-size:14px;cursor:pointer";
-      element.setAttribute("aria-label", `Navire ${ship.name}, MMSI ${ship.mmsi}`);
-      element.textContent = "▲";
+      const element = createVesselMarker(ship, ship.mmsi === selectedMmsi);
       markersRef.current[ship.mmsi] = new mapboxgl.Marker({
         element,
         rotationAlignment: "map",
@@ -333,7 +379,7 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
         .setPopup(new mapboxgl.Popup({ offset: 14 }).setDOMContent(createVesselPopup(ship)))
         .addTo(map.current);
     }
-  }, [ships]);
+  }, [ships, selectedMmsi]);
 
   const shipTypes = useMemo(() =>
     Array.from(new Set(Object.values(ships).map((ship) => ship.shipType).filter(
@@ -351,10 +397,13 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
       .sort((first, second) => first.name.localeCompare(second.name));
   }, [ships, searchQuery, typeFilter]);
 
+  const selectedShip = selectedMmsi ? ships[selectedMmsi] ?? null : null;
+  const selectedHistory = selectedShip ? speedHistory[selectedShip.mmsi] ?? [] : [];
+  const radarShips = useMemo(() => Object.values(ships), [ships]);
+
   const focusOnShip = useCallback((ship: LiveShip) => {
     setSelectedMmsi(ship.mmsi);
     map.current?.flyTo({ center: [ship.longitude, ship.latitude], zoom: 9, duration: 900 });
-    markersRef.current[ship.mmsi]?.togglePopup();
   }, []);
 
   const saveVessel = useCallback(async (ship: LiveShip) => {
@@ -381,119 +430,261 @@ export default function LiveMap({ session, trackedMmsis, onSaveVessel, onOpenPro
     ? "Aucune position reçue depuis plus de 2 min"
     : connectionMessage;
 
+  useEffect(() => {
+    onConnectionChange({ status, message: statusMessage });
+  }, [onConnectionChange, status, statusMessage]);
+
+  useEffect(() => {
+    const visible = new Set(filteredShips.map((ship) => ship.mmsi));
+    for (const [mmsi, marker] of Object.entries(markersRef.current)) {
+      marker.getElement().classList.toggle("filtered-out", !visible.has(mmsi));
+    }
+  }, [filteredShips]);
+
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold tracking-[0.18em] text-[#45e0bd]">SUIVI MARITIME · AIS</p>
-          <h1 className="mt-2 font-['Manrope'] text-2xl font-bold text-[#eef4f6]">Prospection en mer</h1>
-          <p className="mt-1 text-sm text-[#91a2ae]">
-            Côte ouest-africaine jusqu’à Pointe-Noire · Données AIS pouvant être incomplètes ou retardées.
-          </p>
+    <>
+      <section aria-label="Carte AIS de la côte ouest-africaine" className="map-stage">
+        <div aria-label="Carte des navires AIS entre Dakar et Pointe-Noire" id="map" ref={mapContainer} />
+        <div className="map-heading">
+          <span className="eyebrow">SUIVI MARITIME · AIS</span>
+          <h1>Prospection en mer</h1>
+          <p>Côte ouest-africaine · jusqu’à Pointe-Noire</p>
         </div>
-        <StatusBadge status={status} message={statusMessage} />
-      </header>
-
-      {mapError && <p role="alert" className="rounded-lg border border-rose-300/20 bg-rose-300/5 p-3 text-sm text-rose-200">{mapError}</p>}
-      {saveError && <p role="alert" className="rounded-lg border border-rose-300/20 bg-rose-300/5 p-3 text-sm text-rose-200">{saveError}</p>}
-
-      <div className="grid min-h-[620px] gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="relative min-h-[430px] overflow-hidden rounded-xl border border-white/10 bg-[#0b2533]">
-          <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-lg border border-white/10 bg-[#091622]/90 px-3 py-2 text-xs text-[#d4dfe5]">
-            <strong>{Object.keys(ships).length}</strong> navire{Object.keys(ships).length === 1 ? "" : "s"} reçu{Object.keys(ships).length === 1 ? "" : "s"} dans la zone
-          </div>
-          <div aria-label="Carte des navires AIS entre le Sénégal et Pointe-Noire" className="absolute inset-0" ref={mapContainer} />
-        </div>
-
-        <aside className="flex min-h-[430px] flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0b1926]">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <h2 className="font-semibold text-white">Navires détectés</h2>
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-[#b6c5ce]">{filteredShips.length}</span>
-          </div>
-          <div className="space-y-2 border-b border-white/10 p-3">
-            <label className="sr-only" htmlFor="vessel-search">Rechercher un navire</label>
-            <input
-              className="w-full rounded-lg border border-white/10 bg-[#07131f] px-3 py-2 text-sm text-white outline-none placeholder:text-[#71838f] focus:border-[#45e0bd]/50"
-              id="vessel-search"
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Nom, MMSI, destination…"
-              type="search"
-              value={searchQuery}
-            />
-            <label className="sr-only" htmlFor="vessel-type-filter">Filtrer par type de navire</label>
-            <select
-              className="w-full rounded-lg border border-white/10 bg-[#07131f] px-3 py-2 text-sm text-white outline-none focus:border-[#45e0bd]/50"
-              id="vessel-type-filter"
-              onChange={(event) => setTypeFilter(event.target.value)}
-              value={typeFilter}
+        <label className="search-wrap">
+          <span aria-hidden="true" className="search-icon">⌕</span>
+          <span className="sr-only">Rechercher un navire</span>
+          <input
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Nom, MMSI, destination…"
+            type="search"
+            value={searchQuery}
+          />
+        </label>
+        <div aria-label="Filtrer par type de navire" className="map-toolbar">
+          <button
+            aria-pressed={typeFilter === "all"}
+            className={`filter-chip ${typeFilter === "all" ? "selected" : ""}`}
+            onClick={() => setTypeFilter("all")}
+            type="button"
+          >
+            <span aria-hidden="true" className="chip-dot all-dot" /> Tous
+            <span>{Object.keys(ships).length}</span>
+          </button>
+          {shipTypes.map((shipType) => (
+            <button
+              aria-pressed={typeFilter === shipType}
+              className={`filter-chip ${typeFilter === shipType ? "selected" : ""}`}
+              key={shipType}
+              onClick={() => setTypeFilter(shipType)}
+              type="button"
             >
-              <option value="all">Tous les types</option>
-              {shipTypes.map((shipType) => <option key={shipType} value={shipType}>{shipType}</option>)}
-            </select>
+              <span aria-hidden="true" className="chip-dot cargo-dot" />
+              {shipType}
+              <span>{Object.values(ships).filter((ship) => ship.shipType === shipType).length}</span>
+            </button>
+          ))}
+        </div>
+        {mapError && <p role="alert" className="map-error-note">{mapError}</p>}
+        {saveError && <p role="alert" className="map-error-note">{saveError}</p>}
+        <div className="map-attribution-note">
+          <span aria-hidden="true" className="map-locate-dot" />
+          <strong>{Object.keys(ships).length}</strong>
+          <span>contacts AIS reçus dans la zone</span>
+        </div>
+        <section
+          aria-label={`Radar schématique : ${radarShips.length} dernières positions AIS reçues`}
+          className="radar-card"
+          role="img"
+        >
+          <div className="radar-header">
+            <div>
+              <span className="radar-kicker"><span aria-hidden="true" className="radar-live-dot" /> CONTACTS AIS</span>
+              <strong>Vue de zone</strong>
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {filteredShips.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm leading-6 text-[#91a2ae]">
-                {searchQuery || typeFilter !== "all"
-                  ? "Aucun navire ne correspond aux filtres."
-                  : connectionStatus === "live"
-                    ? "Flux actif. Aucune position reçue dans la zone pour le moment."
-                    : "Les navires apparaîtront ici lorsque le flux AIS sera connecté."}
-              </p>
-            ) : filteredShips.map((ship) => {
-              const alreadyTracked = trackedMmsis.has(ship.mmsi);
-              const lastSeen = new Date(ship.receivedAt).toLocaleTimeString("fr-FR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+          <div className="radar">
+            <div className="radar-range range-outer" />
+            <div className="radar-range range-middle" />
+            <div className="radar-range range-inner" />
+            <span aria-hidden="true" className="radar-crosshair crosshair-x" />
+            <span aria-hidden="true" className="radar-crosshair crosshair-y" />
+            <span aria-hidden="true" className="radar-sweep" />
+            {radarShips.map((ship) => {
+              const left = ((ship.longitude - TRACKING_REGION.west) / (TRACKING_REGION.east - TRACKING_REGION.west)) * 100;
+              const top = ((TRACKING_REGION.north - ship.latitude) / (TRACKING_REGION.north - TRACKING_REGION.south)) * 100;
               return (
-                <article
-                  className={`border-b border-white/5 px-4 py-3 ${selectedMmsi === ship.mmsi ? "bg-[#142736]" : ""}`}
+                <span
+                  aria-hidden="true"
+                  className="radar-contact"
                   key={ship.mmsi}
-                >
-                  <button className="w-full text-left" onClick={() => focusOnShip(ship)} type="button">
-                    <span className="block truncate text-sm font-semibold text-white">{ship.name}</span>
-                    <span className="mt-1 block text-xs text-[#91a2ae]">
-                      MMSI {ship.mmsi}
-                      {ship.shipType && ` · ${ship.shipType}`}
-                    </span>
-                    <span className="mt-1 block text-xs text-[#71838f]">
-                      {ship.speedKnots === null ? "Vitesse indisponible" : `${ship.speedKnots.toFixed(1)} nd`}
-                      {ship.course !== null && ` · cap ${Math.round(ship.course)}°`}
-                      {` · reçu à ${lastSeen}`}
-                    </span>
-                    {ship.destination && (
-                      <span className="mt-1 block truncate text-xs text-[#71838f]">
-                        Destination déclarée : {ship.destination}
-                      </span>
-                    )}
-                  </button>
-                  <div className="mt-2 flex justify-end">
-                    {alreadyTracked ? (
-                      <button
-                        className="text-xs font-medium text-[#45e0bd] hover:text-[#8df2d9]"
-                        onClick={onOpenProspects}
-                        type="button"
-                      >
-                        Voir dans mes prospects
-                      </button>
-                    ) : (
-                      <button
-                        className="rounded-md border border-[#45e0bd]/30 px-2.5 py-1.5 text-xs font-semibold text-[#8df2d9] hover:bg-[#45e0bd]/10 disabled:opacity-50"
-                        disabled={savingMmsi === ship.mmsi}
-                        onClick={() => void saveVessel(ship)}
-                        type="button"
-                      >
-                        {savingMmsi === ship.mmsi ? "Enregistrement…" : "＋ Ajouter aux prospects"}
-                      </button>
-                    )}
-                  </div>
-                </article>
+                  style={{ left: `${left}%`, top: `${top}%` }}
+                  title={`${ship.name} · MMSI ${ship.mmsi}`}
+                />
               );
             })}
+            <span aria-hidden="true" className="radar-center" />
           </div>
-        </aside>
-      </div>
-    </section>
+          <div className="radar-footer">
+            <span>Contacts affichés</span>
+            <strong>{radarShips.length}</strong>
+          </div>
+          <p className="radar-disclaimer">Positions AIS reçues · vue schématique, pas un radar côtier</p>
+        </section>
+        <div className="map-legend">
+          <span className="legend-title">LÉGENDE</span>
+          <span><i className="legend-dot moving" />Position AIS</span>
+          <span><i className="legend-dot anchored" />Port</span>
+        </div>
+      </section>
+
+      <aside aria-label="Contacts et détails AIS" className="details-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">SURVEILLANCE</span>
+            <h2>Trafic maritime</h2>
+          </div>
+          <button
+            aria-label="Réinitialiser les filtres"
+            className="panel-menu"
+            onClick={() => {
+              setSearchQuery("");
+              setTypeFilter("all");
+              setSelectedMmsi(null);
+            }}
+            type="button"
+          >↺</button>
+        </div>
+        <div className="zone-summary">
+          <span aria-hidden="true" className="zone-icon">⌖</span>
+          <span className="zone-copy">
+            <strong>Golfe de Guinée → Pointe-Noire</strong>
+            <span>Dernières positions du relais AIS</span>
+          </span>
+        </div>
+        <div className="traffic-summary">
+          <div><strong>{radarShips.length}</strong><span>CONTACTS REÇUS</span></div>
+          <div><strong>{radarShips.filter((ship) => ship.speedKnots !== null && ship.speedKnots > 0.5).length}</strong><span>EN MOUVEMENT</span></div>
+          <div><strong>{radarShips.filter((ship) => trackedMmsis.has(ship.mmsi)).length}</strong><span>EN PROSPECT</span></div>
+        </div>
+        <div className="vessel-list-header">
+          <span>NAVIRES REÇUS <span className="list-count">{filteredShips.length}</span></span>
+          <button onClick={() => setTypeFilter("all")} type="button">TOUS LES TYPES</button>
+        </div>
+        <div aria-live="polite" className="vessel-list">
+          {filteredShips.length === 0 ? (
+            <p className="empty-state">
+              {searchQuery || typeFilter !== "all"
+                ? "Aucun navire ne correspond aux filtres."
+                : connectionStatus === "live"
+                  ? "Flux connecté. Aucune position AIS reçue dans la zone pour le moment."
+                  : "Les navires apparaîtront ici dès réception de positions AIS réelles."}
+            </p>
+          ) : filteredShips.map((ship) => {
+            const selected = selectedMmsi === ship.mmsi;
+            const lastSeenAt = Date.parse(ship.receivedAt);
+            const lastSeen = Number.isFinite(lastSeenAt)
+              ? new Date(lastSeenAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+              : "inconnue";
+            const statusClass = ship.speedKnots !== null && ship.speedKnots <= 0.5 ? "anchored" : "moving";
+            const iconClass = ship.speedKnots !== null && ship.speedKnots <= 0.5
+              ? "anchored"
+              : ship.shipType?.toLocaleLowerCase("fr").includes("tanker")
+                ? "tanker"
+                : ship.shipType?.toLocaleLowerCase("fr").includes("passenger")
+                  ? "passenger"
+                  : "cargo";
+            return (
+              <button
+                aria-pressed={selected}
+                className={`vessel-row ${selected ? "active" : ""}`}
+                key={ship.mmsi}
+                onClick={() => focusOnShip(ship)}
+                type="button"
+              >
+                <span aria-hidden="true" className={`vessel-type-icon ${iconClass}`}>
+                  <svg viewBox="0 0 24 24"><path d="M12 2 20 20 12 17 4 20 12 2Z" fill="currentColor" /></svg>
+                </span>
+                <span className="vessel-copy">
+                  <strong>{ship.name}</strong>
+                  <span><i className={`vessel-status ${statusClass}`} />{ship.shipType || `MMSI ${ship.mmsi}`}</span>
+                </span>
+                <span className="vessel-distance">
+                  {ship.speedKnots === null ? "—" : `${ship.speedKnots.toFixed(1)} nd`}
+                  <small>{lastSeen}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {selectedShip && (
+          <section aria-label={`Détails AIS de ${selectedShip.name}`} className="selected-vessel">
+            <div className="selected-topline">
+              <span>DÉTAILS · POSITION REÇUE</span>
+              <button aria-label="Fermer les détails" onClick={() => setSelectedMmsi(null)} type="button">×</button>
+            </div>
+            <div className="selected-identity">
+              <span aria-hidden="true" className="selected-ship-icon">⌖</span>
+              <div>
+                <h3>{selectedShip.name}</h3>
+                <span>{selectedShip.shipType || "Type AIS non renseigné"} · MMSI {selectedShip.mmsi}</span>
+              </div>
+            </div>
+            <div className="selected-data">
+              <div><span>VITESSE</span><strong>{selectedShip.speedKnots === null ? "—" : `${selectedShip.speedKnots.toFixed(1)} nd`}</strong></div>
+              <div><span>CAP</span><strong>{selectedShip.course === null ? "—" : `${Math.round(selectedShip.course)}°`}</strong></div>
+              <div><span>POSITIONS</span><strong>{selectedHistory.length}</strong></div>
+            </div>
+            <div className="selected-destination">
+              <span>DESTINATION AIS</span>
+              <strong>{selectedShip.destination || "Non renseignée"}</strong>
+            </div>
+            <div className="selected-destination">
+              <span>COORDONNÉES</span>
+              <strong>{selectedShip.latitude.toFixed(3)}°, {selectedShip.longitude.toFixed(3)}°</strong>
+            </div>
+            <div className="telemetry">
+              <div className="telemetry-heading">
+                <span>HISTORIQUE DE VITESSE</span>
+                <small>Session en cours</small>
+              </div>
+              {selectedHistory.length > 1 ? (
+                <svg aria-label="Historique réel des vitesses reçues depuis cette session" className="telemetry-chart" role="img" viewBox="0 0 160 48" preserveAspectRatio="none">
+                  <polyline
+                    fill="none"
+                    points={selectedHistory.map((sample, index) => {
+                      const x = (index / (selectedHistory.length - 1)) * 156 + 2;
+                      const maximum = Math.max(1, ...selectedHistory.map((item) => item.speed));
+                      const y = 44 - (sample.speed / maximum) * 38;
+                      return `${x},${y}`;
+                    }).join(" ")}
+                    stroke="#45e0bd"
+                    strokeWidth="2"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+              ) : (
+                <p className="telemetry-empty">L’historique se construit à mesure que de nouvelles positions AIS arrivent.</p>
+              )}
+            </div>
+            <button
+              className="track-button"
+              disabled={savingMmsi === selectedShip.mmsi}
+              onClick={() => {
+                if (trackedMmsis.has(selectedShip.mmsi)) onOpenProspects();
+                else void saveVessel(selectedShip);
+              }}
+              type="button"
+            >
+              <span aria-hidden="true">{trackedMmsis.has(selectedShip.mmsi) ? "✓" : "+"}</span>
+              <span>{trackedMmsis.has(selectedShip.mmsi)
+                ? "Consulter la fiche prospect"
+                : savingMmsi === selectedShip.mmsi ? "Enregistrement…" : "Ajouter aux prospects"}</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </section>
+        )}
+        <p className="panel-footnote"><span aria-hidden="true" className="footnote-info">i</span>Positions déclarées par AIS, susceptibles d’être retardées ou incomplètes.</p>
+      </aside>
+    </>
   );
 }

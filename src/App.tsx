@@ -59,11 +59,20 @@ function LoadingScreen() {
   );
 }
 
+type LiveConnection = {
+  status: "connecting" | "live" | "error" | "unavailable";
+  message: string;
+};
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(Boolean(supabase));
   const [activePage, setActivePage] = useState<Page>("map");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [liveConnection, setLiveConnection] = useState<LiveConnection>({
+    status: "connecting",
+    message: "Initialisation du flux AIS…",
+  });
   const documents = useDocuments();
   const prospectState = useProspects(session);
   const trackedMmsis = useMemo(
@@ -107,63 +116,74 @@ function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#07131f] text-[#e8eef4]">
-      <header className="border-b border-white/10 bg-[#091622]">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <img src={shipLogo} alt="" aria-hidden="true" className="h-11 w-11 shrink-0" />
-            <div>
-              <p className="font-['Manrope'] text-lg font-bold text-white">Bess Sök</p>
-              <p className="text-xs text-[#91a2ae]">Prospection maritime</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="max-w-[220px] truncate text-xs text-[#aebdc7]">{session.user.email}</span>
-            <button
-              className="rounded-lg border border-white/15 px-3 py-2 text-xs font-medium text-[#c3cfd6] hover:border-white/30 hover:text-white"
-              onClick={() => void signOut()}
-              type="button"
-            >
-              Déconnexion
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <nav aria-label="Navigation principale" className="border-b border-white/10 bg-[#091622]">
-        <div className="mx-auto flex max-w-[1600px] gap-1 overflow-x-auto px-4 sm:px-6">
+    <div className="app-shell">
+      <aside className="sidebar">
+        <a aria-label="Bess Sök, accueil" className="brand" href="#" onClick={(event) => {
+          event.preventDefault();
+          setActivePage("map");
+        }}>
+          <img src={shipLogo} alt="" aria-hidden="true" />
+          <span className="brand-name">Bess <span>Sök</span></span>
+        </a>
+        <p className="sidebar-caption">ESPACE DE TRAVAIL</p>
+        <nav aria-label="Navigation principale" className="side-nav">
           {pageButtons.map(({ page, icon }) => (
             <button
               aria-current={activePage === page ? "page" : undefined}
-              className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm transition ${
-                activePage === page
-                  ? "border-[#45e0bd] text-white"
-                  : "border-transparent text-[#91a2ae] hover:text-white"
-              }`}
+              className={`nav-link ${activePage === page ? "active" : ""}`}
               key={page}
               onClick={() => setActivePage(page)}
               type="button"
             >
-              <span aria-hidden="true">{icon}</span>
-              {pageLabels[page]}
+              <span aria-hidden="true" className="nav-icon">{icon}</span>
+              <span>{pageLabels[page]}</span>
               {page === "prospects" && prospectState.prospects.length > 0 && (
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
-                  {prospectState.prospects.length}
-                </span>
+                <span className="nav-count">{prospectState.prospects.length}</span>
               )}
             </button>
           ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="demo-note">
+            <span aria-hidden="true" className="demo-note-icon">i</span>
+            <p><strong>Données AIS réelles</strong><br />Seules les positions reçues du relais sont affichées. Aucun navire simulé.</p>
+          </div>
+          <button className="profile-button" onClick={() => void signOut()} type="button" title="Se déconnecter">
+            <span aria-hidden="true" className="avatar">{(session.user.email ?? "B").slice(0, 1).toUpperCase()}</span>
+            <span className="profile-copy">
+              <strong>{session.user.email}</strong>
+              <small>Déconnexion</small>
+            </span>
+            <span aria-hidden="true" className="profile-more">···</span>
+          </button>
         </div>
-      </nav>
+      </aside>
 
-      <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6">
-        {authError && (
-          <p role="alert" className="mb-4 rounded-lg border border-rose-300/20 bg-rose-300/5 p-3 text-sm text-rose-200">
-            {authError}
-          </p>
-        )}
+      <main className="workspace">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <span>BESS SÖK</span>
+            <span aria-hidden="true" className="breadcrumb-divider">/</span>
+            <strong>{pageLabels[activePage]}</strong>
+            {authError && <span role="alert" className="topbar-error">{authError}</span>}
+          </div>
+          <div className="topbar-actions">
+            {activePage === "map" && (
+              <div
+                aria-live="polite"
+                className={`live-status ${liveConnection.status === "live" ? "" : "offline"}`}
+                title={liveConnection.message}
+              >
+                <span aria-hidden="true" className="status-dot" />
+                {liveConnection.status === "live" ? "FLUX AIS ACTIF" : liveConnection.status === "connecting" ? "CONNEXION AIS" : "AIS INDISPONIBLE"}
+              </div>
+            )}
+            <span aria-label={`Connecté en tant que ${session.user.email}`} className="account-email">{session.user.email}</span>
+          </div>
+        </header>
         {activePage === "map" && (
           <LiveMap
+            onConnectionChange={setLiveConnection}
             onOpenProspects={() => setActivePage("prospects")}
             onSaveVessel={prospectState.saveVessel}
             session={session}
@@ -171,14 +191,16 @@ function App() {
           />
         )}
         {activePage === "prospects" && (
-          <ProspectsPage
-            error={prospectState.error}
-            isLoading={prospectState.isLoading}
-            onDelete={prospectState.deleteProspect}
-            onExport={() => exportProspects(prospectState.prospects)}
-            onUpdate={prospectState.updateProspect}
-            prospects={prospectState.prospects}
-          />
+          <div className="workspace-content">
+            <ProspectsPage
+              error={prospectState.error}
+              isLoading={prospectState.isLoading}
+              onDelete={prospectState.deleteProspect}
+              onExport={() => exportProspects(prospectState.prospects)}
+              onUpdate={prospectState.updateProspect}
+              prospects={prospectState.prospects}
+            />
+          </div>
         )}
         {activePage === "documents" && (
           <section className="documents-page !block !min-h-0 !overflow-visible !bg-transparent !p-0">
