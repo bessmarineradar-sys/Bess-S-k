@@ -178,6 +178,17 @@ function App() {
                 {liveConnection.status === "live" ? "FLUX AIS ACTIF" : liveConnection.status === "connecting" ? "CONNEXION AIS" : "AIS INDISPONIBLE"}
               </div>
             )}
+            {activePage === "map" && (
+              <a
+                className="external-map-link"
+                href="https://www.marinetraffic.com/en/ais/embed/zoom:5/centery:5/centerx:0/maptype:1/shownames:true/mmsi:0/shipid:0/fleet:0/ship_type:0/flag:0/destination:0/eta:0/width:100%/height:600"
+                rel="noopener noreferrer"
+                target="_blank"
+                title="Ouvrir MarineTraffic dans un nouvel onglet"
+              >
+                MarineTraffic ↗
+              </a>
+            )}
             <span aria-label={`Connecté en tant que ${session.user.email}`} className="account-email">{session.user.email}</span>
           </div>
         </header>

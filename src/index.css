@@ -61,6 +61,8 @@ button { color: inherit; }
 .breadcrumb-divider { color: #516270; }
 .breadcrumb strong { color: #e0e8ee; font-weight: 500; }
 .topbar-actions { display: flex; align-items: center; gap: 16px; }
+.external-map-link { padding: 6px 9px; border: 1px solid rgba(191,213,228,.16); border-radius: 6px; color: #adbbc6; font-size: 9px; text-decoration: none; white-space: nowrap; }
+.external-map-link:hover { border-color: rgba(69,224,189,.4); color: var(--mint); }
 .live-status { display: flex; align-items: center; gap: 7px; color: #81c9b8; font-size: 8px; font-weight: 700; letter-spacing: 1px; }
 .live-status.offline { color: #d9a77a; }
 .live-status.offline .status-dot { background: #d9a77a; box-shadow: 0 0 8px rgba(217,167,122,.4); }
@@ -330,6 +332,7 @@ button { color: inherit; }
   .topbar { padding: 0 12px; }
   .breadcrumb { font-size: 9px; gap: 6px; }
   .topbar-actions { gap: 8px; }
+  .external-map-link { padding: 5px 6px; font-size: 8px; }
   .account-email { display: none; }
   .live-status { font-size: 0; }
   .live-status .status-dot { width: 7px; height: 7px; }
