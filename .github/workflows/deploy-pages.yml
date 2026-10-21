@@ -33,6 +33,24 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Validate deployment configuration
+        env:
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_AIS_RELAY_URL: ${{ vars.VITE_AIS_RELAY_URL }}
+        run: |
+          missing=0
+          for name in VITE_MAPBOX_TOKEN VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_AIS_RELAY_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub Actions configuration: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Set the first three values as repository Actions secrets and VITE_AIS_RELAY_URL as a repository Actions variable."
+            exit 1
+          fi
       - name: Build site
         run: pnpm build
         env:
