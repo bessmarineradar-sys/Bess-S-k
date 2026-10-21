@@ -298,6 +298,8 @@ button { color: inherit; }
 .auth-card form button[type="submit"]:hover { background: #7dd3fc !important; }
 .auth-card > button:last-child { color: #0369a1; }
 .auth-card > button:last-child:hover { color: #075985; }
+.auth-demo-link { display: block; margin-top: 15px; color: #0369a1; font-size: 11px; text-align: center; text-decoration: none; }
+.auth-demo-link:hover { color: #075985; text-decoration: underline; }
 
 .sidebar-caption, .eyebrow { color: #57748b; }
 .brand-name { color: #123c5b; }

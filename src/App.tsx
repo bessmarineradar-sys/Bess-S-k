@@ -181,6 +181,17 @@ function App() {
             {activePage === "map" && (
               <a
                 className="external-map-link"
+                href={`${import.meta.env.BASE_URL}maritime-demo.html`}
+                rel="noopener noreferrer"
+                target="_blank"
+                title="Ouvrir la démonstration avec navires simulés"
+              >
+                Démo simulation ↗
+              </a>
+            )}
+            {activePage === "map" && (
+              <a
+                className="external-map-link"
                 href="https://www.marinetraffic.com/en/ais/embed/zoom:5/centery:5/centerx:0/maptype:1/shownames:true/mmsi:0/shipid:0/fleet:0/ship_type:0/flag:0/destination:0/eta:0/width:100%/height:600"
                 rel="noopener noreferrer"
                 target="_blank"

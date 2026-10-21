@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#020b14">
+  <title>Bess Sök — simulateur maritime</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e6f7ff;background:#020b14;font-synthesis:none;text-rendering:optimizeLegibility;--cyan:#30dcff;--muted:#8caaba;--line:rgba(88,191,220,.18);--panel:rgba(5,20,32,.96)}
+    *{box-sizing:border-box}
+    body{margin:0;min-width:320px;min-height:100vh;background:#020b14}
+    button,input{font:inherit}
+    button{color:inherit}
+    .app{min-height:100vh;display:grid;grid-template-columns:250px minmax(0,1fr);grid-template-rows:64px minmax(0,1fr)}
+    .topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 22px;border-bottom:1px solid var(--line);background:#061521}
+    .brand{display:flex;align-items:center;gap:11px;color:#eefbff;text-decoration:none;font-weight:800;letter-spacing:.02em}
+    .brand-mark{width:34px;height:34px;display:grid;place-items:center;border:1px solid rgba(48,220,255,.42);border-radius:10px;background:#0b2737;color:var(--cyan);font-size:19px;box-shadow:0 0 18px rgba(48,220,255,.12)}
+    .top-actions{display:flex;align-items:center;gap:10px}
+    .demo-badge,.status{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid rgba(255,190,82,.28);border-radius:999px;background:rgba(118,72,16,.16);color:#ffd48a;font-size:10px;font-weight:800;letter-spacing:.08em}
+    .status{border-color:var(--line);background:#091d2a;color:#9db9c8}
+    .status-dot{width:7px;height:7px;border-radius:50%;background:#ffc45e;box-shadow:0 0 9px #ffc45e}
+    .top-button,.control-button{border:1px solid var(--line);border-radius:7px;background:#0a2030;color:#bcefff;cursor:pointer}
+    .top-button{padding:8px 11px;font-size:11px}
+    .top-button:hover,.control-button:hover{border-color:rgba(48,220,255,.55);background:#103148}
+    .sidebar{display:flex;min-height:0;flex-direction:column;gap:15px;padding:18px 13px;border-right:1px solid var(--line);background:#04111b}
+    .side-title{display:flex;align-items:center;justify-content:space-between;color:#9bb2bf;font-size:10px;font-weight:800;letter-spacing:.12em}
+    .count{padding:3px 7px;border:1px solid var(--line);border-radius:5px;color:var(--cyan);font-size:10px}
+    .vessels{display:grid;gap:7px;overflow:auto}
+    .vessel{width:100%;display:flex;align-items:center;gap:10px;padding:10px;border:1px solid transparent;border-radius:8px;background:transparent;text-align:left;cursor:pointer}
+    .vessel:hover,.vessel.selected{border-color:rgba(48,220,255,.24);background:#0a2030}
+    .vessel-icon{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border:1px solid rgba(48,220,255,.25);border-radius:50%;background:#092436;color:var(--cyan);font-size:15px}
+    .vessel-copy{min-width:0;flex:1;display:grid;gap:4px}
+    .vessel-copy strong{overflow:hidden;color:#e3f6ff;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+    .vessel-copy small{color:#8caaba;font-size:9px}
+    .vessel-speed{color:#80eaff;font-size:10px;white-space:nowrap}
+    .side-note{margin-top:auto;padding:10px;border:1px solid rgba(255,190,82,.2);border-radius:7px;background:rgba(118,72,16,.1);color:#ddc28e;font-size:9px;line-height:1.6}
+    .main{position:relative;min-width:0;min-height:0}
+    #map{position:absolute;inset:0;background:#061522}
+    .map-title{position:absolute;z-index:500;top:18px;left:18px;max-width:min(420px,calc(100% - 36px));padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:rgba(4,18,29,.9);pointer-events:none;box-shadow:0 8px 25px rgba(0,0,0,.18)}
+    .eyebrow{color:#63dfff;font-size:9px;font-weight:800;letter-spacing:.17em}
+    .map-title h1{margin:7px 0 4px;color:#f0fbff;font-size:22px}
+    .map-title p{margin:0;color:#bdd4df;font-size:11px}
+    .map-tools{position:absolute;z-index:1200;top:18px;right:18px;display:flex;gap:7px}
+    .map-tools button{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:rgba(4,18,29,.94);color:#c6eaf6;font-size:10px;cursor:pointer}
+    .map-tools button.active{border-color:rgba(48,220,255,.45);color:var(--cyan)}
+    .map-tools button:disabled{opacity:.5;cursor:not-allowed}
+    .map-footer{position:absolute;z-index:500;bottom:52px;left:18px;display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:rgba(4,18,29,.92);color:#bdd4df;font-size:10px}
+    .map-footer strong{color:var(--cyan)}
+    .speed-panel{position:absolute;z-index:1200;right:18px;bottom:52px;display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:rgba(4,18,29,.95)}
+    .control-button{padding:7px 10px;font-size:10px}
+    .speed-panel label{color:#b7cfda;font-size:9px}
+    .speed-panel input{width:100px;accent-color:var(--cyan)}
+    .speed-value{min-width:27px;color:var(--cyan);font-size:10px}
+    .ship-marker{width:32px;height:38px;display:grid;place-items:center;filter:drop-shadow(0 0 7px currentColor)}
+    .ship-marker svg{width:32px;height:38px;overflow:hidden}
+    .leaflet-popup-content-wrapper,.leaflet-popup-tip{border:1px solid rgba(48,220,255,.3);background:#071a28;color:#e5f8ff}
+    .leaflet-popup-content{margin:11px 14px;font-size:11px;line-height:1.6}
+    .leaflet-popup-content strong{color:var(--cyan)}
+    .modal-backdrop{position:fixed;z-index:2000;inset:0;display:grid;place-items:center;padding:18px;background:rgba(0,7,13,.78);backdrop-filter:blur(6px)}
+    .modal-backdrop[hidden]{display:none}
+    .modal{width:min(480px,100%);padding:20px;border:1px solid rgba(48,220,255,.3);border-radius:12px;background:#071a28;box-shadow:0 20px 70px rgba(0,0,0,.5)}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .modal h2{margin:0;color:#eafaff;font-size:16px}
+    .modal-close{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:#0b2638;color:#c8eaf4;cursor:pointer}
+    .modal p{color:#a7c0ce;font-size:11px;line-height:1.7}
+    .security-note{padding:11px;border:1px solid rgba(255,190,82,.25);border-radius:7px;background:rgba(118,72,16,.12);color:#f0d7a2!important}
+    .modal a{color:#63dfff}
+    .modal-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
+    .modal-actions a,.modal-actions button{padding:9px 11px;border:1px solid var(--line);border-radius:7px;background:#0a2030;color:#bcefff;font-size:10px;text-decoration:none;cursor:pointer}
+    .modal-actions .primary{border-color:#30c5e8;background:#0b526a;color:#edfbff}
+    .toast{position:fixed;z-index:2200;right:18px;bottom:18px;padding:10px 13px;border:1px solid rgba(48,220,255,.4);border-radius:8px;background:#071a28;color:#dcf8ff;font-size:11px;box-shadow:0 8px 30px #0008}
+    .toast[hidden]{display:none}
+    @media(max-width:760px){.app{grid-template-columns:minmax(0,1fr);grid-template-rows:58px 1fr}.topbar{min-width:0;padding:0 12px}.top-actions{min-width:0;gap:5px}.sidebar{position:absolute;z-index:700;top:58px;left:0;width:min(250px,74vw);height:calc(100dvh - 58px);transform:translateX(-105%);transition:transform .2s}.sidebar.open{transform:translateX(0)}.main{min-height:calc(100dvh - 58px)}.map-title{top:72px;left:12px}.map-title h1{font-size:18px}.map-tools{top:14px;right:10px;flex-wrap:wrap;justify-content:flex-end;max-width:62%}.map-tools button{padding:7px;font-size:9px}.map-footer{bottom:98px;left:10px;font-size:9px}.speed-panel{right:10px;bottom:48px;gap:6px;padding:7px}.speed-panel input{width:76px}.demo-badge{gap:5px;padding:6px;font-size:0}.demo-badge::after{content:"SIM";font-size:8px}.top-button{font-size:8px;padding:6px 7px}.brand{gap:7px;font-size:11px}.brand>span:last-child{display:none}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Retour à Bess Sök">
+        <span class="brand-mark" aria-hidden="true">⌖</span>BESS SÖK <span style="font-weight:500;color:#8caaba">/ SIMULATEUR</span>
+      </a>
+      <div class="top-actions">
+        <span class="demo-badge"><span class="status-dot" aria-hidden="true"></span>DÉMONSTRATION · POSITIONS FICTIVES</span>
+        <button class="top-button" id="settingsButton" type="button">Configuration</button>
+        <button class="top-button" id="menuButton" type="button" aria-label="Afficher la liste des navires">☰</button>
+      </div>
+    </header>
+    <aside class="sidebar" id="sidebar">
+      <div class="side-title"><span>FLOTTE DE DÉMONSTRATION</span><span class="count" id="vesselCount">0</span></div>
+      <div class="vessels" id="vesselList" aria-live="polite"></div>
+      <div class="side-note"><strong>Mode simulation.</strong> Ces navires, routes, vitesses et statuts sont fictifs. Ils ne représentent pas des positions AIS réelles et ne peuvent pas être enregistrés comme prospects.</div>
+    </aside>
+    <main class="main">
+      <div id="map" aria-label="Carte simulée des routes maritimes d'Afrique de l'Ouest à Pointe-Noire"></div>
+      <div class="map-title">
+        <span class="eyebrow">RÉSEAU MARITIME · SIMULATION</span>
+        <h1>Afrique de l’Ouest → Pointe-Noire</h1>
+        <p>Allers-retours animés entre les ports du golfe de Guinée</p>
+      </div>
+      <div class="map-tools">
+        <button class="active" id="playButton" type="button">Ⅱ Pause</button>
+        <button id="settingsMapButton" type="button">⚙ Réglages AIS</button>
+        <button id="copyButton" type="button">Copier le HTML</button>
+        <button id="downloadButton" type="button">Télécharger .html</button>
+      </div>
+      <div class="map-footer"><strong id="mapCount">6</strong><span>navires de démonstration</span><span>·</span><span id="simState">Simulation active</span></div>
+      <div class="speed-panel">
+        <button class="control-button" id="speedDown" type="button" aria-label="Diminuer la vitesse">−</button>
+        <label for="speedRange">Vitesse</label>
+        <input id="speedRange" type="range" min="1" max="10" value="4">
+        <span class="speed-value" id="speedValue">4×</span>
+        <button class="control-button" id="speedUp" type="button" aria-label="Augmenter la vitesse">+</button>
+      </div>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="settingsModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="modal-head">
+        <h2 id="settingsTitle">Connexion aux données AIS</h2>
+        <button class="modal-close" id="closeSettings" type="button" aria-label="Fermer">×</button>
+      </div>
+      <p>Ce fichier HTML fonctionne en simulation et ne se connecte pas à un fournisseur AIS. Une connexion Internet est nécessaire pour charger Leaflet et le fond de carte. Pour voir les positions réelles et privées, utilisez Bess Sök et son relais sécurisé.</p>
+      <p class="security-note"><strong>Protégez votre clé API :</strong> ne la collez jamais dans ce fichier HTML ni dans un navigateur. Configurez <code>AISSTREAM_API_KEY</code> comme variable secrète privée sur Render; la connexion réelle passe ensuite par le relais de Bess Sök.</p>
+      <div class="modal-actions">
+        <a class="primary" href="./" target="_blank" rel="noopener noreferrer">Ouvrir Bess Sök (AIS réel) ↗</a>
+        <button id="resumeButton" type="button">Continuer la simulation</button>
+      </div>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (() => {
+      "use strict";
+
+      const PORTS = {
+        Dakar: [14.7167, -17.4676],
+        Abidjan: [5.36, -4.0083],
+        Tema: [5.6037, -0.187],
+        Lagos: [6.5244, 3.3792],
+        Douala: [4.0511, 9.692],
+        "Pointe-Noire": [-4.7692, 11.8636]
+      };
+      const ROUTES = {
+        Dakar: [PORTS.Dakar, [11.5, -17.8], [4.5, -11], [3.8, -4], [2.5, 3], [-.5, 7.5], [-3.2, 10.5], PORTS["Pointe-Noire"]],
+        Abidjan: [PORTS.Abidjan, [3.5, -3.8], [2.2, 3.2], [-.8, 7.8], [-3.5, 10.6], PORTS["Pointe-Noire"]],
+        Lagos: [PORTS.Lagos, [5.2, 3.8], [2.8, 6.2], [0, 8.5], [-3, 10.8], PORTS["Pointe-Noire"]],
+        Douala: [PORTS.Douala, [3.5, 9.1], [1, 8.8], [-2, 9.8], PORTS["Pointe-Noire"]],
+        Tema: [PORTS.Tema, [4, 2.5], [2.8, 7], [3.8, 9.2], PORTS.Douala]
+      };
+      const fleet = [
+        { name: "ATLANTIC MERIDIAN", type: "Porte-conteneurs", origin: "Dakar", speed: 18.2, route: "Dakar", progress: .27, color: "#38dcff" },
+        { name: "GULF COAST RUNNER", type: "Porte-conteneurs", origin: "Abidjan", speed: 16.8, route: "Abidjan", progress: .64, color: "#45d9ff" },
+        { name: "GULF OF GUINEA", type: "Pétrolier", origin: "Lagos", speed: 13.5, route: "Lagos", progress: .78, color: "#ffc05d" },
+        { name: "COASTAL SERVICE", type: "Navire de service", origin: "Douala", speed: 11.4, route: "Douala", progress: .35, color: "#75e5bb" },
+        { name: "WEST AFRICA TRADER", type: "Cargo", origin: "Tema", speed: 14.1, route: "Tema", progress: .47, color: "#bd9bff" },
+        { name: "SOUTH ATLANTIC LNG", type: "Transporteur GNL", origin: "Dakar", speed: 12.6, route: "Dakar", progress: .81, color: "#ff8bc8" }
+      ];
+
+      const map = L.map("map", { zoomControl: false, preferCanvas: true }).setView([3.5, -2], 4);
+      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}", {
+        attribution: 'Tiles &copy; Esri — Sources: GEBCO, NOAA, Garmin, HERE, contributors, and the GIS User Community',
+        maxZoom: 18
+      }).addTo(map);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      const routeLayers = [];
+      const markers = new Map();
+      const list = document.getElementById("vesselList");
+      const pauseButton = document.getElementById("playButton");
+      const speedRange = document.getElementById("speedRange");
+      let running = true;
+      let speedMultiplier = 4;
+      let selectedIndex = -1;
+      let previousFrame = 0;
+      let toastTimer;
+
+      function haversine(a, b) {
+        const rad = Math.PI / 180;
+        const dLat = (b[0] - a[0]) * rad;
+        const dLng = (b[1] - a[1]) * rad;
+        const v = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) ** 2;
+        return 6371000 * 2 * Math.atan2(Math.sqrt(v), Math.sqrt(1 - v));
+      }
+
+      function prepareRoute(points) {
+        const lengths = [];
+        let total = 0;
+        for (let index = 1; index < points.length; index += 1) {
+          const length = haversine(points[index - 1], points[index]);
+          lengths.push(length);
+          total += length;
+        }
+        return { points, lengths, total };
+      }
+
+      function pointAt(route, progress) {
+        const target = route.total * Math.max(0, Math.min(1, progress));
+        let traversed = 0;
+        for (let index = 0; index < route.lengths.length; index += 1) {
+          const length = route.lengths[index];
+          if (target <= traversed + length || index === route.lengths.length - 1) {
+            const part = length ? (target - traversed) / length : 0;
+            const from = route.points[index];
+            const to = route.points[index + 1];
+            return [from[0] + (to[0] - from[0]) * part, from[1] + (to[1] - from[1]) * part];
+          }
+          traversed += length;
+        }
+        return route.points[route.points.length - 1];
+      }
+
+      function bearingBetween(from, to) {
+        const rad = Math.PI / 180;
+        const lat1 = from[0] * rad;
+        const lat2 = to[0] * rad;
+        const dLng = (to[1] - from[1]) * rad;
+        const y = Math.sin(dLng) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+      }
+
+      function iconFor(vessel) {
+        return L.divIcon({
+          className: "",
+          iconSize: [32, 38],
+          iconAnchor: [16, 19],
+          html: `<div class="ship-marker" style="color:${vessel.color};transform:rotate(${vessel.heading}deg)"><svg width="32" height="38" viewBox="0 0 32 38" role="img" aria-label="Navire simulé"><path d="M16 2 24 12 22 30 16 34 10 30 8 12Z" fill="${vessel.color}" fill-opacity=".92" stroke="#e8fbff" stroke-width="1.4"/><path d="M16 10 20 15 12 15Z" fill="#032033"/><path d="M4 32c3-2 5 2 8 0s5 2 8 0 5 2 8 0" fill="none" stroke="${vessel.color}" stroke-width="1.6" stroke-linecap="round" opacity=".88"/></svg></div>`
+        });
+      }
+
+      Object.entries(PORTS).forEach(([name, position]) => {
+        const isDestination = name === "Pointe-Noire";
+        const port = L.circleMarker(position, {
+          radius: isDestination ? 5 : 4,
+          color: isDestination ? "#ffc05d" : "#39dcff",
+          weight: 2,
+          fillColor: isDestination ? "#ffc05d" : "#39dcff",
+          fillOpacity: .9
+        }).addTo(map);
+        port.bindTooltip(name, { direction: "top", offset: [0, -4] });
+      });
+
+      Object.entries(ROUTES).forEach(([name, coordinates]) => {
+        const forward = L.polyline(coordinates, { color: "#36c8ee", weight: 2, opacity: .36, dashArray: "5 8" }).addTo(map);
+        routeLayers.push(forward);
+        if (name !== "Tema") {
+          routeLayers.push(L.polyline([...coordinates].reverse(), { color: "#36c8ee", weight: 1, opacity: .16, dashArray: "2 10" }).addTo(map));
+        }
+      });
+
+      fleet.forEach((vessel, index) => {
+        vessel.preparedRoute = prepareRoute(ROUTES[vessel.route]);
+        vessel.destination = vessel.route === "Tema" ? "Douala" : "Pointe-Noire";
+        vessel.progress = Math.max(0, Math.min(.99, vessel.progress));
+        vessel.direction = 1;
+        vessel.position = pointAt(vessel.preparedRoute, vessel.progress);
+        vessel.heading = bearingBetween(vessel.position, pointAt(vessel.preparedRoute, Math.min(1, vessel.progress + .002)));
+        vessel.status = `Vers ${vessel.destination}`;
+        const marker = L.marker(vessel.position, { icon: iconFor(vessel), keyboard: true }).addTo(map);
+        marker.bindPopup(`<strong>${vessel.name}</strong><br>${vessel.type}<br>Trajet : ${vessel.origin} ↔ ${vessel.destination}<br>Vitesse simulée : ${vessel.speed.toFixed(1)} nd<br><em>Position fictive de démonstration</em>`);
+        marker.on("click", () => selectVessel(index));
+        vessel.marker = marker;
+        markers.set(index, marker);
+
+        const row = document.createElement("button");
+        row.className = "vessel";
+        row.type = "button";
+        row.dataset.index = String(index);
+        row.innerHTML = `<span class="vessel-icon" style="color:${vessel.color}">▲</span><span class="vessel-copy"><strong>${vessel.name}</strong><small>${vessel.type} · <span class="vessel-direction">${vessel.status}</span></small></span><span class="vessel-speed">${vessel.speed.toFixed(1)} nd</span>`;
+        row.addEventListener("click", () => selectVessel(index));
+        list.append(row);
+      });
+
+      document.getElementById("vesselCount").textContent = String(fleet.length);
+      document.getElementById("mapCount").textContent = String(fleet.length);
+
+      function selectVessel(index) {
+        selectedIndex = index;
+        document.querySelectorAll(".vessel").forEach((row) => row.classList.toggle("selected", Number(row.dataset.index) === index));
+        const vessel = fleet[index];
+        map.flyTo(vessel.position, Math.max(map.getZoom(), 6), { duration: .7 });
+        vessel.marker.openPopup();
+        if (window.innerWidth <= 760) document.getElementById("sidebar").classList.remove("open");
+      }
+
+      function animate(timestamp) {
+        if (!previousFrame) previousFrame = timestamp;
+        const elapsed = Math.min((timestamp - previousFrame) / 1000, .1);
+        previousFrame = timestamp;
+        if (running) {
+          fleet.forEach((vessel, index) => {
+            const route = vessel.preparedRoute;
+            const routeProgressPerSecond = (.0018 + vessel.speed / 10000) * speedMultiplier;
+            vessel.progress += vessel.direction * routeProgressPerSecond * elapsed;
+            if (vessel.progress >= 1) {
+              vessel.progress = 1;
+              vessel.direction = -1;
+              vessel.status = `Retour vers ${vessel.origin}`;
+            } else if (vessel.progress <= 0) {
+              vessel.progress = 0;
+              vessel.direction = 1;
+              vessel.status = `Vers ${vessel.destination}`;
+            }
+            vessel.position = pointAt(route, vessel.progress);
+            const nextProgress = Math.max(0, Math.min(1, vessel.progress + vessel.direction * .002));
+            vessel.heading = bearingBetween(vessel.position, pointAt(route, nextProgress));
+            vessel.marker.setLatLng(vessel.position).setIcon(iconFor(vessel));
+            const direction = list.querySelector(`[data-index="${index}"] .vessel-direction`);
+            if (direction) direction.textContent = vessel.status || "Vers Pointe-Noire";
+          });
+        }
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+
+      pauseButton.addEventListener("click", () => {
+        running = !running;
+        pauseButton.textContent = running ? "Ⅱ Pause" : "▶ Reprendre";
+        pauseButton.classList.toggle("active", running);
+        document.getElementById("simState").textContent = running ? "Simulation active" : "Simulation en pause";
+      });
+      speedRange.addEventListener("input", () => {
+        speedMultiplier = Number(speedRange.value);
+        document.getElementById("speedValue").textContent = `${speedMultiplier}×`;
+      });
+      document.getElementById("speedDown").addEventListener("click", () => {
+        speedRange.value = String(Math.max(Number(speedRange.min), Number(speedRange.value) - 1));
+        speedRange.dispatchEvent(new Event("input"));
+      });
+      document.getElementById("speedUp").addEventListener("click", () => {
+        speedRange.value = String(Math.min(Number(speedRange.max), Number(speedRange.value) + 1));
+        speedRange.dispatchEvent(new Event("input"));
+      });
+
+      const modal = document.getElementById("settingsModal");
+      function openSettings() { modal.hidden = false; document.getElementById("closeSettings").focus(); }
+      function closeSettings() { modal.hidden = true; document.getElementById("settingsButton").focus(); }
+      document.getElementById("settingsButton").addEventListener("click", openSettings);
+      document.getElementById("settingsMapButton").addEventListener("click", openSettings);
+      document.getElementById("closeSettings").addEventListener("click", closeSettings);
+      document.getElementById("resumeButton").addEventListener("click", closeSettings);
+      modal.addEventListener("click", (event) => { if (event.target === modal) closeSettings(); });
+      document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !modal.hidden) closeSettings(); });
+      document.getElementById("menuButton").addEventListener("click", () => document.getElementById("sidebar").classList.toggle("open"));
+
+      function showToast(message) {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { toast.hidden = true; }, 2600);
+      }
+
+      async function copyHtml() {
+        try {
+          await navigator.clipboard.writeText(`<!doctype html>\n${document.documentElement.outerHTML}`);
+          showToast("Code HTML copié.");
+        } catch (error) {
+          const source = document.createElement("textarea");
+          source.value = `<!doctype html>\n${document.documentElement.outerHTML}`;
+          source.style.position = "fixed";
+          source.style.opacity = "0";
+          document.body.append(source);
+          source.select();
+          const copied = document.execCommand("copy");
+          source.remove();
+          if (!copied) throw error;
+          showToast("Code HTML copié.");
+        }
+      }
+
+      document.getElementById("copyButton").addEventListener("click", () => {
+        void copyHtml().catch(() => showToast("Copie refusée par le navigateur. Téléchargez plutôt le fichier HTML."));
+      });
+      document.getElementById("downloadButton").addEventListener("click", () => {
+        const source = `<!doctype html>\n${document.documentElement.outerHTML}`;
+        const url = URL.createObjectURL(new Blob([source], { type: "text/html;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "bess-sok-simulateur-maritime.html";
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast("Téléchargement lancé.");
+      });
+
+      map.fitBounds(L.latLngBounds(Object.values(PORTS)).pad(.18));
+    })();
+  </script>
+</body>
+</html>

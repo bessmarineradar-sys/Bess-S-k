@@ -118,6 +118,12 @@ export default function AuthScreen() {
             >
               {mode === "sign-in" ? "Créer un compte" : "J’ai déjà un compte"}
             </button>
+            <a
+              className="auth-demo-link"
+              href={`${import.meta.env.BASE_URL}maritime-demo.html`}
+            >
+              Découvrir le simulateur · positions fictives ↗
+            </a>
           </>
         )}
       </section>

@@ -35,6 +35,10 @@ Dans les paramètres du dépôt GitHub, ajoute `VITE_MAPBOX_TOKEN`, `VITE_SUPABA
 
 Ne place jamais la clé AISStream dans une variable `VITE_*`, dans GitHub Pages ou dans le dépôt.
 
+## Simulateur autonome
+
+La page `public/maritime-demo.html` est une démonstration Leaflet autonome à ouvrir depuis `/maritime-demo.html`. Elle anime six navires fictifs en aller-retour et propose pause, réglage de vitesse, copie et téléchargement du HTML. Un bandeau indique explicitement que les données sont simulées; ces positions ne sont pas des données AIS et ne sont pas enregistrables comme prospects. La page utilise Leaflet et les tuiles Esri via Internet. Pour les positions AIS réelles, ouvre l’application Bess Sök : la clé fournisseur reste uniquement sur Render et n’est jamais saisie dans le fichier HTML.
+
 ## Zone de suivi AIS
 
 Le relais filtre actuellement le rectangle latitude `-7..22` et longitude `-20..15`, de Dakar à Pointe-Noire. C’est une zone rectangulaire approximative, pas une frontière côtière; la couverture, la fraîcheur et la disponibilité dépendent du fournisseur AIS et de ses quotas. L’application indique les interruptions et signale l’absence de nouvelle position après deux minutes.
