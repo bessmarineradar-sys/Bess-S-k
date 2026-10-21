@@ -25,7 +25,7 @@ Copie `.env.example` vers `.env.local` et renseigne les clés du frontend :
 
 Dans Supabase, exécute `supabase/migrations/202610210001_create_prospects.sql`, active le fournisseur d’authentification e-mail, puis ajoute l’URL GitHub Pages et l’URL locale aux URL autorisées. Les utilisateurs créent leur compte depuis l’écran de connexion de l’application.
 
-Le relais est défini dans `render.yaml`. Son installation utilise le lockfile pnpm dédié de `server/`, indépendamment du workspace frontend. Crée le service Render depuis le dépôt avec ce fichier Blueprint et configure ses variables privées :
+Le relais est défini dans `render.yaml`. Son installation utilise le lockfile npm dédié de `server/`, indépendamment du workspace pnpm du frontend. Crée le service Render depuis le dépôt avec ce fichier Blueprint et configure ses variables privées :
 
 - `AISSTREAM_API_KEY` : clé AISStream, uniquement côté Render.
 - `SUPABASE_URL` et `SUPABASE_ANON_KEY` : mêmes valeurs Supabase que le frontend; le relais valide les sessions utilisateurs avant de créer un ticket WebSocket à usage unique.

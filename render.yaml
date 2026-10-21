@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    buildCommand: pnpm install --frozen-lockfile --ignore-workspace
-    startCommand: pnpm start
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: AISSTREAM_API_KEY
