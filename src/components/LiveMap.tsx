@@ -135,7 +135,7 @@ function vesselColor(shipType: string | null) {
 function createVesselMarker(ship: LiveShip, selected: boolean) {
   const element = document.createElement("div");
   element.className = `live-vessel-marker ship-marker${selected ? " selected" : ""}`;
-  element.style.cssText = `width:24px;height:24px;overflow:hidden;display:grid;place-items:center;border:1px solid ${selected ? "#e8fff8" : "#0b1926"};border-radius:50%;background:#0b1926;color:${vesselColor(ship.shipType)};box-shadow:0 2px 8px rgba(0,0,0,.4);cursor:pointer`;
+  element.style.cssText = `width:24px;height:24px;overflow:hidden;display:grid;place-items:center;border:1px solid ${selected ? "#075985" : "#f0f9ff"};border-radius:50%;background:${selected ? "#bae6fd" : "#f0f9ff"};color:${vesselColor(ship.shipType)};box-shadow:0 2px 8px rgba(16,63,96,.35);cursor:pointer`;
   element.setAttribute("aria-label", `Navire ${ship.name}, MMSI ${ship.mmsi}`);
   const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   icon.setAttribute("width", "16");
@@ -192,7 +192,7 @@ export default function LiveMap({
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: "mapbox://styles/mapbox/dark-v11",
+        style: "mapbox://styles/mapbox/light-v11",
         center: [-3, 8],
         zoom: 4.1,
         maxBounds: [
@@ -206,7 +206,7 @@ export default function LiveMap({
       });
 
       ports.forEach((port) => {
-        new mapboxgl.Marker({ color: "#45e0bd" })
+        new mapboxgl.Marker({ color: "#0284c7" })
           .setLngLat([port.longitude, port.latitude])
           .setPopup(new mapboxgl.Popup({ offset: 18 }).setDOMContent(createPortElement(port.name)))
           .addTo(map.current!);
@@ -364,7 +364,8 @@ export default function LiveMap({
       if (existing) {
         existing.setLngLat(coordinates).setRotation(ship.course ?? 0);
         existing.getElement().classList.toggle("selected", ship.mmsi === selectedMmsi);
-        existing.getElement().style.borderColor = ship.mmsi === selectedMmsi ? "#e8fff8" : "#0b1926";
+        existing.getElement().style.borderColor = ship.mmsi === selectedMmsi ? "#075985" : "#f0f9ff";
+        existing.getElement().style.backgroundColor = ship.mmsi === selectedMmsi ? "#bae6fd" : "#f0f9ff";
         existing.getElement().style.color = vesselColor(ship.shipType);
         existing.setPopup(new mapboxgl.Popup({ offset: 14 }).setDOMContent(createVesselPopup(ship)));
         continue;

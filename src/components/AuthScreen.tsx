@@ -46,8 +46,8 @@ export default function AuthScreen() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#07131f] px-4 py-10 text-[#e8eef4]">
-      <section className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0b1926] p-7 shadow-2xl">
+    <main className="auth-screen flex min-h-screen items-center justify-center bg-[#07131f] px-4 py-10 text-[#e8eef4]">
+      <section className="auth-card w-full max-w-md rounded-2xl border border-white/10 bg-[#0b1926] p-7 shadow-2xl">
         <div className="mb-6 flex items-center gap-3">
           <img src={shipLogo} alt="" className="h-14 w-14" />
           <div>
