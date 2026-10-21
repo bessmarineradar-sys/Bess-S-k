@@ -27,6 +27,9 @@ export default function AuthScreen() {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
+          options: {
+            emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).toString(),
+          },
         });
         if (signUpError) throw signUpError;
         if (!data.session) {
