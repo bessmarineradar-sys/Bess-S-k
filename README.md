@@ -21,7 +21,7 @@ Copie `.env.example` vers `.env.local` et renseigne les clés du frontend :
 
 - `VITE_MAPBOX_TOKEN` : jeton public Mapbox `pk.*`, limité aux styles, tuiles et polices nécessaires et restreint aux domaines utilisés.
 - `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` : URL du projet et clé publique Supabase. La clé frontend n’est pas un secret; l’accès aux prospects est protégé par les politiques RLS de la migration.
-- `VITE_AIS_RELAY_URL` : URL HTTPS/WSS du relais Render, par exemple `https://<service>.onrender.com` (le client accepte aussi une URL `wss://`).
+- `VITE_AIS_RELAY_URL` : URL du relais Render, par exemple `wss://bess-sok-ais-relay.onrender.com` en production.
 
 Dans Supabase, exécute `supabase/migrations/202610210001_create_prospects.sql`, active le fournisseur d’authentification e-mail, puis ajoute l’URL GitHub Pages et l’URL locale aux URL autorisées. Les utilisateurs créent leur compte depuis l’écran de connexion de l’application.
 
