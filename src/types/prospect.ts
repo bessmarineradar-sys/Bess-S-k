@@ -16,6 +16,12 @@ export interface Prospect {
   company: string;
   status: ProspectStatus;
   notes: string;
+  callSign: string | null;
+  imo: string | null;
+  draught: string | null;
+  lengthM: number | null;
+  beamM: number | null;
+  eta: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +34,12 @@ export type ProspectRow = {
   vessel_type: string | null;
   destination: string | null;
   company: string | null;
+  call_sign: string | null;
+  imo: string | null;
+  draught: string | null;
+  length_m: number | null;
+  beam_m: number | null;
+  eta: string | null;
   status: ProspectStatus;
   notes: string;
   created_at: string;
@@ -41,6 +53,12 @@ export type ProspectInsert = {
   vessel_type: string | null;
   destination: string | null;
   company?: string | null;
+  call_sign?: string | null;
+  imo?: string | null;
+  draught?: string | null;
+  length_m?: number | null;
+  beam_m?: number | null;
+  eta?: string | null;
   status?: ProspectStatus;
   notes?: string;
 };
@@ -50,6 +68,12 @@ export type ProspectUpdate = {
   vessel_type?: string | null;
   destination?: string | null;
   company?: string | null;
+  call_sign?: string | null;
+  imo?: string | null;
+  draught?: string | null;
+  length_m?: number | null;
+  beam_m?: number | null;
+  eta?: string | null;
   status?: ProspectStatus;
   notes?: string;
 };
@@ -80,6 +104,12 @@ export function toProspect(row: ProspectRow): Prospect {
     vesselType: row.vessel_type,
     destination: row.destination,
     company: row.company ?? "",
+    callSign: row.call_sign ?? null,
+    imo: row.imo ?? null,
+    draught: row.draught ?? null,
+    lengthM: row.length_m ?? null,
+    beamM: row.beam_m ?? null,
+    eta: row.eta ?? null,
     status: row.status,
     notes: row.notes,
     createdAt: row.created_at,

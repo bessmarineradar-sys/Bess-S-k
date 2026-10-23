@@ -6,6 +6,12 @@ create table if not exists public.prospects (
   vessel_type text,
   destination text,
   company text,
+  call_sign text,
+  imo text,
+  draught text,
+  length_m integer,
+  beam_m integer,
+  eta text,
   status text not null default 'new'
     check (status in ('new', 'contacted', 'follow_up', 'qualified', 'closed', 'not_relevant')),
   notes text not null default '' check (char_length(notes) <= 5000),

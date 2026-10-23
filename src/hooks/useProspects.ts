@@ -13,6 +13,12 @@ export interface VesselForProspect {
   name: string;
   shipType: string | null;
   destination: string | null;
+  callSign: string | null;
+  imo: string | null;
+  draught: string | null;
+  lengthM: number | null;
+  beamM: number | null;
+  eta: string | null;
 }
 
 export function useProspects(session: Session | null) {
@@ -60,6 +66,12 @@ export function useProspects(session: Session | null) {
       vessel_name: vessel.name,
       vessel_type: vessel.shipType,
       destination: vessel.destination,
+      call_sign: vessel.callSign,
+      imo: vessel.imo,
+      draught: vessel.draught,
+      length_m: vessel.lengthM,
+      beam_m: vessel.beamM,
+      eta: vessel.eta,
       company: null,
       notes: "",
       status: "new",

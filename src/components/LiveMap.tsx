@@ -8,18 +8,23 @@ import type { VesselForProspect } from "../hooks/useProspects";
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 
 const TRACKING_REGION = {
-  south: -7,
-  north: 22,
-  west: -20,
-  east: 15,
+  south: -6.5,
+  north: 15.5,
+  west: -19.5,
+  east: 12.5,
 };
 
 const ports = [
   { name: "Port de Dakar", longitude: -17.4676, latitude: 14.7167 },
   { name: "Port d'Abidjan", longitude: -4.0083, latitude: 5.36 },
   { name: "Port de Tema", longitude: -0.187, latitude: 5.6037 },
+  { name: "Port de Lomé", longitude: 1.282, latitude: 6.1319 },
+  { name: "Port de Cotonou", longitude: 2.435, latitude: 6.345 },
   { name: "Port de Lagos", longitude: 3.3792, latitude: 6.5244 },
+  { name: "Port d'Onne", longitude: 7.15, latitude: 4.72 },
   { name: "Port de Douala", longitude: 9.692, latitude: 4.0511 },
+  { name: "Port de Libreville", longitude: 9.45, latitude: 0.39 },
+  { name: "Port-Gentil", longitude: 8.78, latitude: -0.72 },
   { name: "Port de Pointe-Noire", longitude: 11.8636, latitude: -4.7692 },
 ];
 
@@ -174,6 +179,7 @@ export default function LiveMap({
   const [mapError, setMapError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"map" | "radar">("map");
   const [selectedMmsi, setSelectedMmsi] = useState<string | null>(null);
   const [savingMmsi, setSavingMmsi] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -193,11 +199,11 @@ export default function LiveMap({
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: "mapbox://styles/mapbox/light-v11",
-        center: [-3, 8],
-        zoom: 4.1,
+        center: [-3.5, 4.5],
+        zoom: 4.2,
         maxBounds: [
-          [TRACKING_REGION.west - 3, TRACKING_REGION.south - 2],
-          [TRACKING_REGION.east + 3, TRACKING_REGION.north + 2],
+          [TRACKING_REGION.west, TRACKING_REGION.south],
+          [TRACKING_REGION.east, TRACKING_REGION.north],
         ],
       });
       map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
@@ -404,8 +410,10 @@ export default function LiveMap({
 
   const focusOnShip = useCallback((ship: LiveShip) => {
     setSelectedMmsi(ship.mmsi);
-    map.current?.flyTo({ center: [ship.longitude, ship.latitude], zoom: 9, duration: 900 });
-  }, []);
+    if (viewMode === "map") {
+      map.current?.flyTo({ center: [ship.longitude, ship.latitude], zoom: 9, duration: 900 });
+    }
+  }, [viewMode]);
 
   const saveVessel = useCallback(async (ship: LiveShip) => {
     setSavingMmsi(ship.mmsi);
@@ -416,6 +424,12 @@ export default function LiveMap({
         name: ship.name,
         shipType: ship.shipType,
         destination: ship.destination,
+        callSign: ship.callSign,
+        imo: ship.imo,
+        draught: ship.draught,
+        lengthM: ship.lengthM,
+        beamM: ship.beamM,
+        eta: ship.eta,
       });
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Impossible d’enregistrer ce navire.");
@@ -444,12 +458,30 @@ export default function LiveMap({
 
   return (
     <>
-      <section aria-label="Carte AIS de la côte ouest-africaine" className="map-stage">
+      <section aria-label="Carte AIS de la côte ouest-africaine" className={`map-stage ${viewMode === "radar" ? "radar-mode" : ""}`}>
         <div aria-label="Carte des navires AIS entre Dakar et Pointe-Noire" id="map" ref={mapContainer} />
         <div className="map-heading">
-          <span className="eyebrow">SUIVI MARITIME · AIS</span>
-          <h1>Prospection en mer</h1>
-          <p>Côte ouest-africaine · jusqu’à Pointe-Noire</p>
+          <span className="eyebrow">{viewMode === "radar" ? "RADAR · POSITIONS AIS RÉELLES" : "SUIVI MARITIME · AIS"}</span>
+          <h1>{viewMode === "radar" ? "Radar de zone" : "Prospection en mer"}</h1>
+          <p>{viewMode === "radar" ? "Contacts reçus du flux AIS sécurisé" : "Côte ouest-africaine · jusqu’à Pointe-Noire"}</p>
+        </div>
+        <div aria-label="Mode d’affichage" className="map-view-switch" role="group">
+          <button
+            aria-pressed={viewMode === "map"}
+            className={viewMode === "map" ? "selected" : ""}
+            onClick={() => setViewMode("map")}
+            type="button"
+          >
+            Carte
+          </button>
+          <button
+            aria-pressed={viewMode === "radar"}
+            className={viewMode === "radar" ? "selected" : ""}
+            onClick={() => setViewMode("radar")}
+            type="button"
+          >
+            Radar AIS
+          </button>
         </div>
         <label className="search-wrap">
           <span aria-hidden="true" className="search-icon">⌕</span>
@@ -485,21 +517,73 @@ export default function LiveMap({
             </button>
           ))}
         </div>
-        {mapError && <p role="alert" className="map-error-note">{mapError}</p>}
+        {mapError && viewMode === "map" && <p role="alert" className="map-error-note">{mapError}</p>}
         {saveError && <p role="alert" className="map-error-note">{saveError}</p>}
-        <div className="map-attribution-note">
+        <div className="map-attribution-note" hidden={viewMode === "radar"}>
           <span aria-hidden="true" className="map-locate-dot" />
           <strong>{Object.keys(ships).length}</strong>
           <span>contacts AIS reçus dans la zone</span>
         </div>
+        {viewMode === "radar" && (
+          <section aria-label={`Radar AIS réel : ${radarShips.length} positions reçues`} className="live-radar-view">
+            <div className="live-radar-status">
+              <span className={`radar-feed-indicator ${status === "live" ? "connected" : ""}`} />
+              <strong>{status === "live" ? "AISSTREAM · CONNECTÉ" : status === "connecting" ? "AISSTREAM · CONNEXION" : "AISSTREAM · INDISPONIBLE"}</strong>
+              <span>{statusMessage}</span>
+            </div>
+            <div aria-label="Positions AIS réelles dans la zone de suivi, longitude −19,5 à 12,5 degrés et latitude −6,5 à 15,5 degrés" className="live-radar-plot" role="group">
+              <span className="radar-axis-label latitude north">15,5° N</span>
+              <span className="radar-axis-label latitude south">6,5° S</span>
+              <span className="radar-axis-label longitude west">19,5° O</span>
+              <span className="radar-axis-label longitude east">12,5° E</span>
+              <span aria-hidden="true" className="radar-sweep" />
+              {radarShips.map((ship) => {
+                const left = ((ship.longitude - TRACKING_REGION.west) / (TRACKING_REGION.east - TRACKING_REGION.west)) * 100;
+                const top = ((TRACKING_REGION.north - ship.latitude) / (TRACKING_REGION.north - TRACKING_REGION.south)) * 100;
+                const ageMs = staleCheckAt - Date.parse(ship.receivedAt);
+                const stale = !Number.isFinite(ageMs) || ageMs > 120_000;
+                const selected = ship.mmsi === selectedMmsi;
+                const coordinates = `${ship.latitude.toFixed(3)}° ${ship.latitude >= 0 ? "N" : "S"}, ${ship.longitude.toFixed(3)}° ${ship.longitude >= 0 ? "E" : "O"}`;
+                const lastSeen = Number.isFinite(ageMs)
+                  ? ageMs < 60_000 ? "à l’instant" : `il y a ${Math.floor(ageMs / 60_000)} min`
+                  : "heure inconnue";
+                return (
+                  <button
+                    aria-label={`${ship.name}, MMSI ${ship.mmsi}, coordonnées ${coordinates}, ${lastSeen}`}
+                    aria-pressed={selected}
+                    className={`radar-target${selected ? " selected" : ""}`}
+                    key={ship.mmsi}
+                    onClick={() => focusOnShip(ship)}
+                    style={{ left: `${left}%`, top: `${top}%`, color: vesselColor(ship.shipType) }}
+                    title={`${ship.name} · MMSI ${ship.mmsi} · ${coordinates} · ${lastSeen}`}
+                    type="button"
+                    data-stale={stale}
+                  >
+                    <span className="radar-target-dot" />
+                    {selected && <span className="radar-target-label">{ship.name} · {coordinates}</span>}
+                  </button>
+                );
+              })}
+              <span aria-hidden="true" className="radar-port-label dakar">DAKAR</span>
+              <span aria-hidden="true" className="radar-port-label pointe-noire">POINTE-NOIRE</span>
+            </div>
+            <div className="live-radar-footer">
+              <span><i className="radar-target-key" /> Contact AIS réel</span>
+              <span>Dernière position reçue : {lastPositionAt === null ? "en attente" : new Date(lastPositionAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+              <strong>{radarShips.length} navires</strong>
+            </div>
+            <p className="live-radar-disclaimer">Affichage cartographique des positions déclarées par AIS — ce système n’est pas un radar de navigation certifié.</p>
+          </section>
+        )}
         <section
           aria-label={`Radar schématique : ${radarShips.length} dernières positions AIS reçues`}
           className="radar-card"
+          hidden={viewMode === "radar"}
           role="img"
         >
           <div className="radar-header">
             <div>
-              <span className="radar-kicker"><span aria-hidden="true" className="radar-live-dot" /> CONTACTS AIS</span>
+              <span className="radar-kicker"><span aria-hidden="true" className={`radar-live-dot ${status === "live" ? "" : "offline"}`} /> POSITIONS AIS</span>
               <strong>Vue de zone</strong>
             </div>
           </div>
@@ -531,7 +615,7 @@ export default function LiveMap({
           </div>
           <p className="radar-disclaimer">Positions AIS reçues · vue schématique, pas un radar côtier</p>
         </section>
-        <div className="map-legend">
+        <div className="map-legend" hidden={viewMode === "radar"}>
           <span className="legend-title">LÉGENDE</span>
           <span><i className="legend-dot moving" />Position AIS</span>
           <span><i className="legend-dot anchored" />Port</span>
@@ -630,10 +714,20 @@ export default function LiveMap({
                 <span>{selectedShip.shipType || "Type AIS non renseigné"} · MMSI {selectedShip.mmsi}</span>
               </div>
             </div>
+            {selectedShip.callSign && (
+              <div className="selected-indicatif">
+                <span>INDICATIF</span>
+                <strong>{selectedShip.callSign}</strong>
+              </div>
+            )}
             <div className="selected-data">
               <div><span>VITESSE</span><strong>{selectedShip.speedKnots === null ? "—" : `${selectedShip.speedKnots.toFixed(1)} nd`}</strong></div>
               <div><span>CAP</span><strong>{selectedShip.course === null ? "—" : `${Math.round(selectedShip.course)}°`}</strong></div>
               <div><span>POSITIONS</span><strong>{selectedHistory.length}</strong></div>
+              {selectedShip.imo && <div><span>IMO</span><strong>{selectedShip.imo}</strong></div>}
+              {selectedShip.draught && <div><span>TIRANT D'EAU</span><strong>{selectedShip.draught} m</strong></div>}
+              {selectedShip.lengthM !== null && selectedShip.beamM !== null && <div><span>DIMENSIONS</span><strong>{Math.round(selectedShip.lengthM)} m × {Math.round(selectedShip.beamM)} m</strong></div>}
+              {selectedShip.eta && <div><span>ETA</span><strong>{selectedShip.eta}</strong></div>}
             </div>
             <div className="selected-destination">
               <span>DESTINATION AIS</span>
